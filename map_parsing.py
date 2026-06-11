@@ -1,3 +1,84 @@
+import sys
+from map_creator import DroneMap, Zone, Connection
+
+class UsageError(Exception):
+    def __init__(self, message: str = "Usage Error: python3 XXXXX "
+                 "config.txt") -> None:
+        super().__init__(message)
+
+class MissingDroneNumber(Exception):
+    def __init__(self, message: str = "Index Error: A drone number is needed") -> None:
+        super().__init__(message)
+
+class DroneNumberError(Exception):
+    def __init__(self, message: str = "Value Error: A valid drone number is needed") -> None:
+        super().__init__(message)
+
+def main() -> None:
+    if len(sys.argv) != 2:
+        raise UsageError
+    try:
+        with open(sys.argv[1]) as file:
+            drone_line = file.readline()
+            drone_split = drone_line.split(" ")
+            drone_nbr = int(drone_split[1].strip("\n"))
+            for line in file:
+                if line.strip() and not line.strip().startswith("#"):
+                    if line.strip().startswith("start_hub"):
+                        Zone(line)
+                    elif line.strip().startswith("end_hub"):
+                        Zone(line)
+                    elif line.strip().startswith("hub"):
+                        Zone(line)
+                    elif line.strip().startswith("connection"):
+                        Connection(line)
+            
+    except FileNotFoundError:
+        raise FileNotFoundError("File not present") 
+    except IndexError:
+            raise MissingDroneNumber(", line 1")
+    except ValueError:
+            raise DroneNumberError(", line 1")
+    
+        
+        
+            
+            
+            map = DroneMap(drone_nbr, 
+                
+                 for line in file if
+                       line.strip() and not line.strip().startswith("#"))}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class UsageError(Exception):
     """
     Exception raised when the program is executed with invalid arguments.
