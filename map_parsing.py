@@ -1,5 +1,5 @@
 import sys
-from map_creator import DroneMap, Zone, Connection
+from map_creator import DroneMap, parse_zone, parse_connection
 
 class UsageError(Exception):
     def __init__(self, message: str = "Usage Error: python3 XXXXX "
@@ -14,232 +14,89 @@ class DroneNumberError(Exception):
     def __init__(self, message: str = "Value Error: A valid drone number is needed") -> None:
         super().__init__(message)
 
-def main() -> None:
+def map_creation() -> DroneMap:
     if len(sys.argv) != 2:
-        raise UsageError
+        raise UsageError 
     try:
         with open(sys.argv[1]) as file:
-            drone_line = file.readline()
-            drone_split = drone_line.split(" ")
-            drone_nbr = int(drone_split[1].strip("\n"))
+            line_num = 0
+            drone_nbr = None
+            start_hub_name = None
+            end_hub_name = None
             for line in file:
-                if line.strip() and not line.strip().startswith("#"):
-                    if line.strip().startswith("start_hub"):
-                        Zone(line)
-                    elif line.strip().startswith("end_hub"):
-                        Zone(line)
-                    elif line.strip().startswith("hub"):
-                        Zone(line)
-                    elif line.strip().startswith("connection"):
-                        Connection(line)
+                line_num += 1
+                line_clean = line.strip() #elimino todos los espacios antes y después
+                
+                if not line_clean or line_clean.startswith("#"):
+                    continue
+
+                if not line_clean.startswith("nb_drones:"):
+                    raise DroneNumberError(f"Value Error: Expected 'nb_drones:', line {line_num}")
+
+                try:
+                    value_part = line_clean.split(":", 1)[1].strip()
+                    drone_nbr = int(value_part)
+                except (IndexError, ValueError):
+                    raise DroneNumberError(f"Value Error: A valid drone number is needed, line {line_num}")
+                
+                if drone_nbr <= 0:
+                    raise DroneNumberError(f"Value Error: Drone number must be a positive integer, line {line_num}")
+                break
+
+            if drone_nbr is None:
+                raise MissingDroneNumber("Index Error: A drone number is needed at the beginning of the file")        
             
+            map = DroneMap(drone_nbr)
+
+            for line in file:
+                line_num +=1
+                line_clean = line.strip()
+                if not line.clean() or line.clean.startswith("#"):
+                    continue
+                if line_clean.startswith(("start_hub", "end_hub", "hub")):
+                        zone = parse_zone(line, line_num)
+                        if line_clean.startswith("start_hub:"):
+                            if start_hub_name is not None:
+                                raise ValueError(f"Parsing Error: Multiple start_hubs detected, line {line_num}")
+                            start_hub_name = zone.name
+                        elif line_clean.startswith("end_hub:"):
+                            if end_hub_name is not None:
+                                raise ValueError(f"Parsing Error: Multiple end_hubs detected, line {line_num}")
+                            end_hub_name = zone.name
+                            map.zone_map[zone.name] = zone
+                elif line.strip().startswith("connection"):
+                    connection = parse_connection(line, line_num)
+
+                    if connection.zone_start not in map.zone_map:
+                        raise ValueError(f"Parsing Error: Zone '{connection.zone_start}' is not defined, line {line_num}")
+                    if connection.zone_finish not in map.zone_map:
+                        raise ValueError(f"Parsing Error: Zone '{connection.zone_finish}' is not defined, line {line_num}")
+                    for existing_conn in map.connection_map:
+                        match_direct = (existing_conn.zone_start == connection.zone_start and 
+                                        existing_conn.zone_finish == connection.zone_finish)
+                        match_inverted = (existing_conn.zone_start == connection.zone_finish and 
+                                          existing_conn.zone_finish == connection.zone_start)
+                        
+                        if match_direct or match_inverted:
+                            raise ValueError(f"Parsing Error: Duplicate connection between '{connection.zone_start}' and '{connection.zone_finish}', line {line_num}")
+                    map.connection_map.append(connection)
+            
+            if start_hub_name is None:
+                raise ValueError("Parsing Error: Missing 'start_hub:' zone in the file")
+                
+            if end_hub_name is None:
+                raise ValueError("Parsing Error: Missing 'end_hub:' zone in the file")
+                
+            if start_hub_name == end_hub_name:
+                raise ValueError(f"Parsing Error: 'start_hub' and 'end_hub' cannot be the same ('{start_hub_name}')")
+        
+        return map
     except FileNotFoundError:
         raise FileNotFoundError("File not present") 
-    except IndexError:
-            raise MissingDroneNumber(", line 1")
-    except ValueError:
-            raise DroneNumberError(", line 1")
-    
-        
-        
-            
-            
-            map = DroneMap(drone_nbr, 
-                
-                 for line in file if
-                       line.strip() and not line.strip().startswith("#"))}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-class UsageError(Exception):
-    """
-    Exception raised when the program is executed with invalid arguments.
-    """
-
-    def __init__(self, message: str = "Usage Error: python3 a_maze_ing.py "
-                 "config.txt") -> None:
-        """
-        Initialize the exception with a custom error message.
-
-        Args:
-            message (str): Error message to display.
-
-        Returns:
-            None
-        """
-        super().__init__(message)
-
-
-class ConfigSyntaxError(Exception):
-    """
-    Exception raised when the configuration file syntax is invalid.
-    """
-
-    def __init__(self, message: str = "Invalid config file syntax.") -> None:
-        """
-        Initialize the exception with a custom error message.
-
-        Args:
-            message (str): Error message to display.
-
-        Returns:
-            None
-        """
-        super().__init__(message)
-
-
-class MissingConfigKeyError(Exception):
-    """
-    Exception raised when a required key
-    is missing from the configuration file.
-    """
-
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-
-
-class ConfigValueError(Exception):
-    """
-    Exception raised when a configuration key has an invalid value type.
-    """
-
-    def __init__(self, message: str) -> None:
-        """Initialize the exception with a custom error message.
-
-        Args:
-            message (str): Error message to display.
-        """
-        super().__init__(message)
-
-
-class MazeError(Exception):
-    """
-    Custom exception for invalid maze configurations.
-    """
-
-    def __init__(self, message: str = "Invalid maze configuration") -> None:
-        """
-        Initialize the exception with a custom error message.
-
-        Args:
-            message (str): Explanation of the error.
-                Defaults to "Invalid maze configuration".
-
-        Returns:
-            None
-        """
-        super().__init__(message)
-
-
-def parse_config_line(line: str) -> tuple[str, str]:
-    """
-    Parse a configuration line into a key-value pair.
-
-    The expected format is:
-
-        KEY=VALUE
-
-    Args:
-        line (str): Configuration line to parse.
-
-    Returns:
-        tuple[str, str]: Parsed key and value.
-
-    Raises:
-        ConfigSyntaxError: If the line format is invalid.
-    """
-    parts = line.split("=", 1)
-    if len(parts) != 2:
-        raise ConfigSyntaxError(f"Invalid config format: '{line.strip()}'. "
-                                "Expected 'KEY=VALUE'")
-    key, value = parts
-    if not key.strip():
-        raise ConfigSyntaxError(
-            f"Missing key in config line: '{line.strip()}'")
-    return key.strip(), value.strip()
-
-    if int(config["WIDTH"]) <= 7 or int(config["HEIGHT"]) <= 5:
-        print("To show the 42, the maze mmust be larger than 7x5")
+if __name__ == "__main__":
     try:
-        maze_gen = MazeGenerator(config)
-    except Exception:
-        raise MazeError
-    
+        map = map_creation()
 
-def main() -> None:
-    try:
-        if len(sys.argv) != 2:
-            raise UsageError
-        if sys.argv[1] != "config.txt":
-            raise UsageError
-        with open(sys.argv[1]) as file:
-            config = {key.strip(): value.strip() for key, value in
-                      (parse_config_line(line) for line in file if
-                       line.strip() and not line.strip().startswith("#"))}
-        REQUIRED_KEYS = {
-            "WIDTH",
-            "HEIGHT",
-            "ENTRY",
-            "EXIT",
-            "OUTPUT_FILE",
-            "PERFECT"
-        }
-        missing_keys = [
-            req_key for req_key in REQUIRED_KEYS if req_key not in config
-        ]
-        if missing_keys:
-            keys_str = ', '.join(missing_keys)
-            msg = f"Config Error: Missing required keys:{keys_str}"
-            raise MissingConfigKeyError(msg)
-
-        if config["PERFECT"] not in ("True", "False"):
-            raise ConfigValueError(
-                f"Config Error: Invalid value for 'PERFECT'. "
-                f"Expected 'True' or 'False', got '{config['PERFECT']}'."
-            )
-        generate = random_generator(config)
-        menu(generate, config)
-    except UsageError as e:
+    except Exception as e:
         print(e)
-    except FileNotFoundError:
-        print("config.txt file not present")
-    except MissingConfigKeyError as e:
-        print(e)
-    except ConfigValueError as e:
-        print(e)
-    except ConfigSyntaxError as e:
-        print(e)
-    except ValueError:
-        print(
-            "ValueError: Entry and exit coordinates must only contain numbers"
-        )
-    except MazeError:
-        return
