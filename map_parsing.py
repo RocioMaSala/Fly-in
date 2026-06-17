@@ -44,26 +44,26 @@ def map_creation() -> DroneMap:
                 break
 
             if drone_nbr is None:
-                raise MissingDroneNumber("Index Error: A drone number is needed at the beginning of the file")        
-            
+                raise MissingDroneNumber("Index Error: A drone number is needed at the beginning of the file")
+
             map = DroneMap(drone_nbr)
 
             for line in file:
-                line_num +=1
+                line_num += 1
                 line_clean = line.strip()
                 if not line.clean() or line.clean.startswith("#"):
                     continue
                 if line_clean.startswith(("start_hub", "end_hub", "hub")):
-                        zone = parse_zone(line, line_num)
-                        if line_clean.startswith("start_hub:"):
-                            if start_hub_name is not None:
-                                raise ValueError(f"Parsing Error: Multiple start_hubs detected, line {line_num}")
-                            start_hub_name = zone.name
-                        elif line_clean.startswith("end_hub:"):
-                            if end_hub_name is not None:
-                                raise ValueError(f"Parsing Error: Multiple end_hubs detected, line {line_num}")
-                            end_hub_name = zone.name
-                            map.zone_map[zone.name] = zone
+                    zone = parse_zone(line, line_num)
+                    if line_clean.startswith("start_hub:"):
+                        if start_hub_name is not None:
+                            raise ValueError(f"Parsing Error: Multiple start_hubs detected, line {line_num}")
+                        start_hub_name = zone.name
+                    elif line_clean.startswith("end_hub:"):
+                        if end_hub_name is not None:
+                            raise ValueError(f"Parsing Error: Multiple end_hubs detected, line {line_num}")
+                        end_hub_name = zone.name
+                    map.zone_map[zone.name] = zone
                 elif line.strip().startswith("connection"):
                     connection = parse_connection(line, line_num)
 
@@ -72,27 +72,28 @@ def map_creation() -> DroneMap:
                     if connection.zone_finish not in map.zone_map:
                         raise ValueError(f"Parsing Error: Zone '{connection.zone_finish}' is not defined, line {line_num}")
                     for existing_conn in map.connection_map:
-                        match_direct = (existing_conn.zone_start == connection.zone_start and 
+                        match_direct = (existing_conn.zone_start == connection.zone_start and
                                         existing_conn.zone_finish == connection.zone_finish)
-                        match_inverted = (existing_conn.zone_start == connection.zone_finish and 
+                        match_inverted = (existing_conn.zone_start == connection.zone_finish and
                                           existing_conn.zone_finish == connection.zone_start)
-                        
+
                         if match_direct or match_inverted:
                             raise ValueError(f"Parsing Error: Duplicate connection between '{connection.zone_start}' and '{connection.zone_finish}', line {line_num}")
                     map.connection_map.append(connection)
-            
+
             if start_hub_name is None:
                 raise ValueError("Parsing Error: Missing 'start_hub:' zone in the file")
-                
+
             if end_hub_name is None:
                 raise ValueError("Parsing Error: Missing 'end_hub:' zone in the file")
-                
+
             if start_hub_name == end_hub_name:
                 raise ValueError(f"Parsing Error: 'start_hub' and 'end_hub' cannot be the same ('{start_hub_name}')")
-        
+
         return map
     except FileNotFoundError:
-        raise FileNotFoundError("File not present") 
+        raise FileNotFoundError("File not present")
+
 
 if __name__ == "__main__":
     try:
