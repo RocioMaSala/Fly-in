@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
+import heapq
 
 
 class ZoneTypeError(Exception):
@@ -31,6 +32,7 @@ class Zone:
     coord_y: int
     start_zone: bool = False
     finish_zone: bool = False
+    max_drones: int = 1
     zone_type: ZoneTypes = ZoneTypes.NORMAL
     color: Optional[str] = None
 
@@ -58,6 +60,34 @@ class DroneMap:
                 dict_adjacency[conection.zone_finish] = []
             dict_adjacency[conection.zone_finish].append(conection.zone_start)
         return dict_adjacency
+    
+    def dijkstra(self) -> tuple[float, list[str]]:
+        start_name = ""
+        end_name = ""
+        for zone in self.zone_map.values():
+            if zone.start_zone:
+                start_name = zone.name
+            elif zone.finish_zone:
+                end_name = zone.name
+        dist = {}
+        for k in self.zone_map.keys():
+            dist[k] = float("inf")
+        dist[start_name] = 0
+        predecessor = {}
+        connection_matrix = self.adjacency()
+
+        heap: list[tuple[float, str]] = []
+        heapq.heappush(heap, (0, start_name))
+        
+        visited = set()
+
+        while heap:
+            current_dist, current_zone = heapq.heappop(heap)
+            visited.
+
+
+
+
 
 
 def parse_zone(line: str, line_num: int) -> Zone:
@@ -90,6 +120,7 @@ def parse_zone(line: str, line_num: int) -> Zone:
 
     zone_type = ZoneTypes.NORMAL
     color = None
+    max_drones = 1
 
     if "[" in line:
         try:
@@ -106,6 +137,9 @@ def parse_zone(line: str, line_num: int) -> Zone:
                         raise ZoneTypeError(line_num)
                 if k == "color":
                     color = v
+                if k == "max_drones":
+                    max_drones = int(v)
+                
         except ZoneTypeError:
             raise
         except Exception:
