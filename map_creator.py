@@ -83,7 +83,48 @@ class DroneMap:
 
         while heap:
             current_dist, current_zone = heapq.heappop(heap)
-            visited.
+            if current_zone in visited:
+                continue
+            visited.add(current_zone)
+        
+            for dest_zone in connection_matrix.get(current_zone,[]):
+                if self.zone_map[dest_zone].zone_type == ZoneTypes.BLOCKED:
+                    continue
+                elif self.zone_map[dest_zone].zone_type == ZoneTypes.NORMAL:
+                    cost = 1
+                elif self.zone_map[dest_zone].zone_type == ZoneTypes.PRIORITY:
+                    cost = 1
+                elif self.zone_map[dest_zone].zone_type == ZoneTypes.RESTRICTED:
+                    cost = 2
+                
+                new_distance = current_dist + cost
+                if new_distance < dist[dest_zone]:
+                    dist[dest_zone] = new_distance
+                    predecessor[dest_zone] = current_zone
+                    heapq.heappush(heap, (new_distance, dest_zone))
+        
+        if dist[end_name] == float("inf"):
+            raise NoPathError
+        
+        path = []
+        current = end_name
+        while current != start_name:
+            path.append(current)
+            current = predecessor[current]
+
+
+
+
+
+
+
+
+
+        
+
+
+
+
 
 
 
