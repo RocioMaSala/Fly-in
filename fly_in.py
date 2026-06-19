@@ -1,7 +1,9 @@
-from map_parsing import map_creation
+from dataclasses import dataclass, field
 
-path_dict[str, float] = {}
 
-def dijkstra ():
-    for zone_map in map:
-        path_dict[name.zone_map].append
+@dataclass
+class DroneSituation:
+    drone_id: int
+    actual_position: str
+    transit_destination: Optional[str] = None
+    reached_final_zone: bool = False

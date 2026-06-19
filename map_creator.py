@@ -17,6 +17,12 @@ class CapacityError(Exception):
             ) -> None:
         super().__init__(f"Line {line_num}, {message}")
 
+class NoPathError(Exception):
+    def __init__(
+            self, line_num: int, message: str = "Invalid Path"
+            ) -> None:
+        super().__init__(f"Line {line_num}, {message}")
+
 
 class ZoneTypes(Enum):
     NORMAL = "normal"
@@ -61,14 +67,14 @@ class DroneMap:
             dict_adjacency[conection.zone_finish].append(conection.zone_start)
         return dict_adjacency
     
-    def dijkstra(self) -> tuple[float, list[str]]:
-        start_name = ""
+    def dijkstra(self, start_name: str, count_drones: dict[str, int]) -> tuple[float, list[str]]:
         end_name = ""
         for zone in self.zone_map.values():
-            if zone.start_zone:
-                start_name = zone.name
-            elif zone.finish_zone:
+            if zone.finish_zone:
                 end_name = zone.name
+                break
+        if start_name == end_name:
+            return (0.0, [start_name])
         dist = {}
         for k in self.zone_map.keys():
             dist[k] = float("inf")
@@ -90,12 +96,18 @@ class DroneMap:
             for dest_zone in connection_matrix.get(current_zone,[]):
                 if self.zone_map[dest_zone].zone_type == ZoneTypes.BLOCKED:
                     continue
-                elif self.zone_map[dest_zone].zone_type == ZoneTypes.NORMAL:
+                if dest_zone != end_name:
+                    drones_actuales = count_drones.get(dest_zone, 0)
+                    if drones_actuales >= self.zone_map[dest_zone].max_drones:
+                        continue
+                if self.zone_map[dest_zone].zone_type == ZoneTypes.NORMAL:
                     cost = 1
                 elif self.zone_map[dest_zone].zone_type == ZoneTypes.PRIORITY:
                     cost = 1
                 elif self.zone_map[dest_zone].zone_type == ZoneTypes.RESTRICTED:
                     cost = 2
+                else:
+                    cost = 1
                 
                 new_distance = current_dist + cost
                 if new_distance < dist[dest_zone]:
@@ -111,24 +123,10 @@ class DroneMap:
         while current != start_name:
             path.append(current)
             current = predecessor[current]
-
-
-
-
-
-
-
-
-
-        
-
-
-
-
-
-
-
-
+        path.append(start_name)
+        path.reverse()
+        total_dist = dist[end_name]
+        return (total_dist, path)
 
 
 def parse_zone(line: str, line_num: int) -> Zone:
@@ -188,7 +186,14 @@ def parse_zone(line: str, line_num: int) -> Zone:
                              f"line {line_num}")
 
     return Zone(
-        name, coord_x, coord_y, start_zone, finish_zone, zone_type, color
+        name=name,
+        coord_x=coord_x,
+        coord_y=coord_y,
+        start_zone=start_zone,
+        finish_zone=finish_zone,
+        max_drones=max_drones,
+        zone_type=zone_type,
+        color=color,
         )
 
 

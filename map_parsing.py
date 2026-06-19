@@ -51,7 +51,7 @@ def map_creation() -> DroneMap:
             for line in file:
                 line_num += 1
                 line_clean = line.strip()
-                if not line.clean() or line.clean.startswith("#"):
+                if not line_clean or line_clean.startswith("#"):
                     continue
                 if line_clean.startswith(("start_hub", "end_hub", "hub")):
                     zone = parse_zone(line, line_num)
