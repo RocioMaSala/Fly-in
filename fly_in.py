@@ -1,9 +1,144 @@
 from dataclasses import dataclass, field
+from map_creator import Connection, Zone, DroneMap, ZoneTypes
+from map_parsing import map_creation
+import heapq
+
+class NoPathError(Exception):
+    def __init__(
+            self, message: str = "Invalid Path"
+            ) -> None:
+        super().__init__(f"{message}")
 
 
 @dataclass
 class DroneSituation:
     drone_id: int
     actual_position: str
-    transit_destination: Optional[str] = None
+    transit_destination: str | None = None
     reached_final_zone: bool = False
+
+
+@dataclass
+class Simulation:
+    static_map: DroneMap
+    drone_list: list[DroneSituation] = field(default_factory=list)
+    actual_zone_occupation: dict[str, list[int]] = field(default_factory=dict)
+    actual_conex_occupation: dict[frozenset[str], list[int]] = field(default_factory=dict)
+    turn_count: int = 0
+    movement_log: list[str] = field(default_factory=list)
+
+
+    def initialize_drones(self) -> None:
+        start_name = ""
+        for zone in self.static_map.zone_map.values():
+            if zone.start_zone:
+                start_name = zone.name
+                break
+        total_drone_nb = self.static_map.drone_number
+        drone_id = 1
+        while drone_id <= total_drone_nb:
+            drone = DroneSituation(drone_id=drone_id, actual_position=start_name)
+            self.drone_list.append(drone)
+            drone_id += 1
+
+    
+    def dijkstra(self, start_name: str) -> tuple[float, list[str]]:
+        end_name = ""
+        for zone in self.static_map.zone_map.values():
+            if zone.finish_zone:
+                end_name = zone.name
+                break
+        if start_name == end_name:
+            return (0.0, [start_name])
+        dist = {}
+        for k in self.static_map.zone_map.keys():
+            dist[k] = float("inf")
+        dist[start_name] = 0
+        predecessor = {}
+        connection_matrix = self.static_map.adjacency()
+
+        heap: list[tuple[float, str]] = []
+        heapq.heappush(heap, (0, start_name))
+        
+        visited = set()
+
+        while heap:
+            current_dist, current_zone = heapq.heappop(heap)
+            if current_zone in visited:
+                continue
+            visited.add(current_zone)
+        
+            for dest_zone in connection_matrix.get(current_zone,[]):
+                if self.static_map.zone_map[dest_zone].zone_type == ZoneTypes.BLOCKED:
+                    continue
+                if dest_zone != end_name:
+                    drones_actuales = len(self.actual_zone_occupation.get(dest_zone, []))
+                    if drones_actuales >= self.static_map.zone_map[dest_zone].max_drones:
+                        continue
+                if self.static_map.zone_map[dest_zone].zone_type == ZoneTypes.NORMAL:
+                    cost = 1
+                elif self.static_map.zone_map[dest_zone].zone_type == ZoneTypes.PRIORITY:
+                    cost = 1
+                elif self.static_map.zone_map[dest_zone].zone_type == ZoneTypes.RESTRICTED:
+                    cost = 2
+                else:
+                    cost = 1
+                
+                new_distance = current_dist + cost
+                if new_distance < dist[dest_zone]:
+                    dist[dest_zone] = new_distance
+                    predecessor[dest_zone] = current_zone
+                    heapq.heappush(heap, (new_distance, dest_zone))
+        
+        if dist[end_name] == float("inf"):
+            raise NoPathError
+        
+        path = []
+        current = end_name
+        while current != start_name:
+            path.append(current)
+            current = predecessor[current]
+        path.append(start_name)
+        path.reverse()
+        total_dist = dist[end_name]
+        return (total_dist, path)
+    
+
+    def process_turn(self) -> None:
+        self.turn_count += 1
+        active_drones = [drone for drone in self.drone_list if not drone.reached_final_zone]
+        temp_dist_path = {}
+        for drone in active_drones:
+            try:
+                temp_dist_path[drone.drone_id] = self.dijkstra(drone.actual_position)
+            except NoPathError:
+                temp_dist_path[drone.drone_id] = (float('inf'), [])
+        active_drones_sorted = sorted(active_drones, key=lambda drone: (temp_dist_path[drone.drone_id][0], drone.drone_id))
+        for drone in active_drones_sorted:
+            if drone.transit_destination:
+                previous_position = drone.actual_position
+                drone.actual_position = drone.transit_destination
+                drone.transit_destination = None
+                self.actual_zone_occupation[drone.actual_position].append(drone.drone_id)
+                self.actual_conex_occupation[previous_position].remove(drone.drone_id)
+
+            else: # Me quedo aqui!! Meterme bien con esta lógica sobre el turno.
+                previous_position = drone.actual_position
+                drone.actual_position = active_drones_sorted[drone.drone_id][1][0] # aqui saco el primer paso a destino?
+                self.actual_zone_occupation[drone.actual_position].append(drone.drone_id)
+                self.actual_zone_occupation[previous_position].remove(drone.drone_id)
+        
+            log_entry = f"Turn {self.turn_count}: Drone D{drone.drone_id}-{drone.actual_position}"
+            self.movement_log.append(log_entry)
+
+
+def main():
+    map_simu = map_creation()
+    simu = Simulation(map_simu)
+    simu.initialize_drones()
+
+
+if __name__ == "__main__":
+    main()
+    
+    

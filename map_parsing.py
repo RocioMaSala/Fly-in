@@ -95,9 +95,8 @@ def map_creation() -> DroneMap:
         raise FileNotFoundError("File not present")
 
 
-if __name__ == "__main__":
+def main():
     try:
         map = map_creation()
-
     except Exception as e:
         print(e)

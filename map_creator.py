@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
-import heapq
+
 
 
 class ZoneTypeError(Exception):
@@ -14,12 +14,6 @@ class ZoneTypeError(Exception):
 class CapacityError(Exception):
     def __init__(
             self, line_num: int, message: str = "Invalid capacity"
-            ) -> None:
-        super().__init__(f"Line {line_num}, {message}")
-
-class NoPathError(Exception):
-    def __init__(
-            self, line_num: int, message: str = "Invalid Path"
             ) -> None:
         super().__init__(f"Line {line_num}, {message}")
 
@@ -67,7 +61,7 @@ class DroneMap:
             dict_adjacency[conection.zone_finish].append(conection.zone_start)
         return dict_adjacency
     
-    def dijkstra(self, start_name: str, count_drones: dict[str, int]) -> tuple[float, list[str]]:
+   # def dijkstra(self, start_name: str, count_drones: dict[str, int]) -> tuple[float, list[str]]:
         end_name = ""
         for zone in self.zone_map.values():
             if zone.finish_zone:
@@ -127,7 +121,7 @@ class DroneMap:
         path.reverse()
         total_dist = dist[end_name]
         return (total_dist, path)
-
+#
 
 def parse_zone(line: str, line_num: int) -> Zone:
     parts = line.strip().split()
