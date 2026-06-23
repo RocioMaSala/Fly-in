@@ -39,6 +39,9 @@ class Simulation:
         while drone_id <= total_drone_nb:
             drone = DroneSituation(drone_id=drone_id, actual_position=start_name)
             self.drone_list.append(drone)
+            if drone.actual_position not in self.actual_zone_occupation:
+                self.actual_zone_occupation[drone.actual_position] = []
+            self.actual_zone_occupation[drone.actual_position].append(drone.drone_id)
             drone_id += 1
 
     
@@ -108,6 +111,7 @@ class Simulation:
         self.turn_count += 1
         active_drones = [drone for drone in self.drone_list if not drone.reached_final_zone]
         temp_dist_path = {}
+        turn_movements = []
         for drone in active_drones:
             try:
                 temp_dist_path[drone.drone_id] = self.dijkstra(drone.actual_position)
@@ -119,17 +123,32 @@ class Simulation:
                 previous_position = drone.actual_position
                 drone.actual_position = drone.transit_destination
                 drone.transit_destination = None
+                if drone.actual_position not in self.actual_zone_occupation:
+                    self.actual_zone_occupation[drone.actual_position] = []
                 self.actual_zone_occupation[drone.actual_position].append(drone.drone_id)
-                self.actual_conex_occupation[previous_position].remove(drone.drone_id)
+                self.actual_conex_occupation[frozenset({previous_position, drone.actual_position})].remove(drone.drone_id)
+                turn_movements.append(f"D{drone.drone_id}-{drone.actual_position}")
 
-            else: # Me quedo aqui!! Meterme bien con esta lógica sobre el turno.
+            else:
+                if temp_dist_path[drone.drone_id][0] == float ('inf'):
+                    continue
                 previous_position = drone.actual_position
-                drone.actual_position = active_drones_sorted[drone.drone_id][1][0] # aqui saco el primer paso a destino?
-                self.actual_zone_occupation[drone.actual_position].append(drone.drone_id)
-                self.actual_zone_occupation[previous_position].remove(drone.drone_id)
-        
-            log_entry = f"Turn {self.turn_count}: Drone D{drone.drone_id}-{drone.actual_position}"
-            self.movement_log.append(log_entry)
+                next_position = temp_dist_path[drone.drone_id][1][1]
+                if self.static_map.zone_map[next_position].zone_type == ZoneTypes.RESTRICTED:
+                    drone.transit_destination = next_position
+                    if frozenset({previous_position, drone.transit_destination}) not in self.actual_conex_occupation:
+                        self.actual_conex_occupation[frozenset({previous_position, drone.transit_destination})] = []
+                    self.actual_conex_occupation[frozenset({previous_position, drone.transit_destination})].append(drone.drone_id)
+                    self.actual_zone_occupation[previous_position].remove(drone.drone_id)               
+                    turn_movements.append(f"D{drone.drone_id}-{drone.transit_destination}")
+                else:
+                    drone.actual_position = next_position
+                    if drone.actual_position not in self.actual_zone_occupation:
+                        self.actual_zone_occupation[drone.actual_position] = []
+                    self.actual_zone_occupation[drone.actual_position].append(drone.drone_id)
+                    self.actual_zone_occupation[previous_position].remove(drone.drone_id)
+                    turn_movements.append(f"D{drone.drone_id}-{drone.actual_position}")
+        self.movement_log.append(" ".join(turn_movements))
 
 
 def main():
