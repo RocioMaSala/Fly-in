@@ -61,67 +61,12 @@ class DroneMap:
             dict_adjacency[conection.zone_finish].append(conection.zone_start)
         return dict_adjacency
     
-   # def dijkstra(self, start_name: str, count_drones: dict[str, int]) -> tuple[float, list[str]]:
-        end_name = ""
-        for zone in self.zone_map.values():
-            if zone.finish_zone:
-                end_name = zone.name
-                break
-        if start_name == end_name:
-            return (0.0, [start_name])
-        dist = {}
-        for k in self.zone_map.keys():
-            dist[k] = float("inf")
-        dist[start_name] = 0
-        predecessor = {}
-        connection_matrix = self.adjacency()
-
-        heap: list[tuple[float, str]] = []
-        heapq.heappush(heap, (0, start_name))
-        
-        visited = set()
-
-        while heap:
-            current_dist, current_zone = heapq.heappop(heap)
-            if current_zone in visited:
-                continue
-            visited.add(current_zone)
-        
-            for dest_zone in connection_matrix.get(current_zone,[]):
-                if self.zone_map[dest_zone].zone_type == ZoneTypes.BLOCKED:
-                    continue
-                if dest_zone != end_name:
-                    drones_actuales = count_drones.get(dest_zone, 0)
-                    if drones_actuales >= self.zone_map[dest_zone].max_drones:
-                        continue
-                if self.zone_map[dest_zone].zone_type == ZoneTypes.NORMAL:
-                    cost = 1
-                elif self.zone_map[dest_zone].zone_type == ZoneTypes.PRIORITY:
-                    cost = 1
-                elif self.zone_map[dest_zone].zone_type == ZoneTypes.RESTRICTED:
-                    cost = 2
-                else:
-                    cost = 1
-                
-                new_distance = current_dist + cost
-                if new_distance < dist[dest_zone]:
-                    dist[dest_zone] = new_distance
-                    predecessor[dest_zone] = current_zone
-                    heapq.heappush(heap, (new_distance, dest_zone))
-        
-        if dist[end_name] == float("inf"):
-            raise NoPathError
-        
-        path = []
-        current = end_name
-        while current != start_name:
-            path.append(current)
-            current = predecessor[current]
-        path.append(start_name)
-        path.reverse()
-        total_dist = dist[end_name]
-        return (total_dist, path)
-#
+    def link_capacity(self) -> dict[frozenset[str], int]:
+        capacity_map = {}
+        for connection in self.connection_map:
+            key = frozenset({connection.zone_start, connection.zone_finish})
+            capacity_map[key] = connection.max_capacity
+        return capacity_map
 
 def parse_zone(line: str, line_num: int) -> Zone:
     parts = line.strip().split()

@@ -9,6 +9,10 @@ class NoPathError(Exception):
             ) -> None:
         super().__init__(f"{message}")
 
+class SimulationTimeoutError(Exception):
+    def __init__(self, message: str = "Simulation exceeded maximum turn limit") -> None:
+        super().__init__(message)
+
 
 @dataclass
 class DroneSituation:
@@ -45,9 +49,7 @@ class Simulation:
             drone_id += 1
 
     
-    def dijkstra(self, start_name: str, ocupacion_temporal: dict[str, list[int]] = None) -> tuple[float, list[str]]:
-        if ocupacion_temporal is None:
-            ocupacion_temporal = self.actual_zone_occupation
+    def dijkstra(self, start_name: str) -> tuple[float, list[str]]:
         end_name = ""
         for zone in self.static_map.zone_map.values():
             if zone.finish_zone:
@@ -64,7 +66,6 @@ class Simulation:
 
         heap: list[tuple[float, str]] = []
         heapq.heappush(heap, (0, start_name))
-        
         visited = set()
 
         while heap:
@@ -72,14 +73,10 @@ class Simulation:
             if current_zone in visited:
                 continue
             visited.add(current_zone)
-        
-            for dest_zone in connection_matrix.get(current_zone,[]):
+
+            for dest_zone in connection_matrix.get(current_zone, []):
                 if self.static_map.zone_map[dest_zone].zone_type == ZoneTypes.BLOCKED:
                     continue
-                if dest_zone != end_name and current_zone == start_name:
-                    drones_actuales = len(ocupacion_temporal.get(dest_zone, []))
-                    if drones_actuales >= self.static_map.zone_map[dest_zone].max_drones:
-                        continue
                 if self.static_map.zone_map[dest_zone].zone_type == ZoneTypes.NORMAL:
                     cost = 1
                 elif self.static_map.zone_map[dest_zone].zone_type == ZoneTypes.PRIORITY:
@@ -88,16 +85,16 @@ class Simulation:
                     cost = 2
                 else:
                     cost = 1
-                
+
                 new_distance = current_dist + cost
                 if new_distance < dist[dest_zone]:
                     dist[dest_zone] = new_distance
                     predecessor[dest_zone] = current_zone
                     heapq.heappush(heap, (new_distance, dest_zone))
-        
+
         if dist[end_name] == float("inf"):
             raise NoPathError
-        
+
         path = []
         current = end_name
         while current != start_name:
@@ -108,98 +105,86 @@ class Simulation:
         total_dist = dist[end_name]
         return (total_dist, path)
     
-
     def process_turn(self) -> None:
         self.turn_count += 1
+        print(f"--- Turno {self.turn_count} ---")
+        active_drones = [drone for drone in self.drone_list if not drone.reached_final_zone]
+        temp_dist_path = {}
         turn_movements = []
-
-        movement_planification = {}
-
-        ocupacion_proyectada = {zona: lista.copy() for zona, lista in self.actual_zone_occupation.items()}
-        
-        drones_in_transit = [d for d in self.drone_list if d.transit_destination and not d.reached_final_zone]
-        
-        for drone in drones_in_transit:
-            movement_planification[drone.drone_id] = ("TRANSIT_END", drone.transit_destination)
-            if drone.transit_destination not in ocupacion_proyectada:
-                ocupacion_proyectada[drone.transit_destination] = []
-            ocupacion_proyectada[drone.transit_destination].append(drone.drone_id)
-
-        free_drones = [d for d in self.drone_list if not d.transit_destination and not d.reached_final_zone]
-        mapa_vacio = {}
-        def order_criteria(drone):
+        link_capacity_map = self.static_map.link_capacity()
+        for drone in active_drones:
             try:
-                distance = self.dijkstra(drone.actual_position, mapa_vacio)[0]
+                temp_dist_path[drone.drone_id] = self.dijkstra(drone.actual_position)
             except NoPathError:
-                distance = float('inf')
-            return(distance, drone.drone_id)
-        
-        free_drones.sort(key=order_criteria)
-
-        for drone in free_drones:
-            orig = drone.actual_position
-            if drone.drone_id in ocupacion_proyectada.get(orig, []):
-                ocupacion_proyectada[orig].remove(drone.drone_id)
-            try:
-                total_distance, path = self.dijkstra(drone.actual_position, ocupacion_proyectada)
-                next_position = path[1]
-
-                print(f"[Turno {self.turn_count}] Dron {drone.drone_id} planifica ir a {next_position}")
-
-
-                if self.static_map.zone_map[next_position].zone_type == ZoneTypes.RESTRICTED:
-                    movement_planification[drone.drone_id] = ("RESTRICTED_START", next_position)
-                else:
-                    movement_planification[drone.drone_id] = ("NORMAL_MOVE", next_position)
-                    if next_position not in ocupacion_proyectada:
-                        ocupacion_proyectada[next_position] = []
-                    ocupacion_proyectada[next_position].append(drone.drone_id)
-            except (NoPathError, IndexError):
-                if drone.drone_id not in ocupacion_proyectada.get(orig, []):
-                    ocupacion_proyectada[orig].append(drone.drone_id)
-                continue
-        
-        for drone in self.drone_list:
-            if drone.drone_id not in movement_planification:
-                continue
-
-            mov_type, destination = movement_planification[drone.drone_id]
-            previous_position = drone.actual_position
-        
-            if mov_type == "TRANSIT_END":
-                drone.actual_position = destination
+                temp_dist_path[drone.drone_id] = (float('inf'), [])
+        active_drones_sorted = sorted(
+            active_drones,
+            key=lambda drone: (temp_dist_path[drone.drone_id][0], drone.drone_id)
+        )
+        for drone in active_drones_sorted:
+            if drone.transit_destination:
+                previous_position = drone.actual_position
+                drone.actual_position = drone.transit_destination
                 drone.transit_destination = None
                 if drone.actual_position not in self.actual_zone_occupation:
                     self.actual_zone_occupation[drone.actual_position] = []
                 self.actual_zone_occupation[drone.actual_position].append(drone.drone_id)
-                self.actual_conex_occupation[frozenset({previous_position, drone.actual_position})].remove(drone.drone_id)
+                self.actual_conex_occupation[
+                    frozenset({previous_position, drone.actual_position})
+                ].remove(drone.drone_id)
+                if self.static_map.zone_map[drone.actual_position].finish_zone:
+                    drone.reached_final_zone = True
+                turn_movements.append(f"D{drone.drone_id}-{drone.actual_position}")
 
-            elif mov_type == "RESTRICTED_START":
-                drone.transit_destination = destination
-                if frozenset({previous_position, drone.transit_destination}) not in self.actual_conex_occupation:
-                    self.actual_conex_occupation[frozenset({previous_position, drone.transit_destination})] = []
-                self.actual_conex_occupation[frozenset({previous_position, drone.transit_destination})].append(drone.drone_id)
-                self.actual_zone_occupation[previous_position].remove(drone.drone_id)
+            else:
+                try:
+                    total_distance, path = self.dijkstra(drone.actual_position)
+                except NoPathError:
+                    continue
+                previous_position = drone.actual_position
+                next_position = path[1]
+                link_key = frozenset({previous_position, next_position})
+                drones_en_conexion = len(self.actual_conex_occupation.get(link_key, []))
+                max_link = link_capacity_map.get(link_key, 1)
+                if drones_en_conexion >= max_link:
+                    continue
 
-            elif mov_type == "NORMAL_MOVE":
-                drone.actual_position = destination
-                if drone.actual_position not in self.actual_zone_occupation:
-                    self.actual_zone_occupation[drone.actual_position] = []
-                self.actual_zone_occupation[drone.actual_position].append(drone.drone_id)
-                self.actual_zone_occupation[previous_position].remove(drone.drone_id)
-            
-            # Comprobación de meta
-            if drone.actual_position and self.static_map.zone_map[drone.actual_position].finish_zone:
-                drone.reached_final_zone = True
-            
-            turn_movements.append(f"D{drone.drone_id}-{destination}")
-    
+                next_zone = self.static_map.zone_map[next_position]
+                next_zone = self.static_map.zone_map[next_position]
+                if not next_zone.finish_zone:
+                    next_zone_drones = len(self.actual_zone_occupation.get(next_position, []))
+                    if next_zone_drones >= next_zone.max_drones:
+                        continue
+
+                if self.static_map.zone_map[next_position].zone_type == ZoneTypes.RESTRICTED:
+                    drone.transit_destination = next_position
+                    key = frozenset({previous_position, drone.transit_destination})
+                    if key not in self.actual_conex_occupation:
+                        self.actual_conex_occupation[key] = []
+                    self.actual_conex_occupation[key].append(drone.drone_id)
+                    self.actual_zone_occupation[previous_position].remove(drone.drone_id)
+                    turn_movements.append(f"D{drone.drone_id}-{drone.transit_destination}")
+                else:
+                    drone.actual_position = next_position
+                    if drone.actual_position not in self.actual_zone_occupation:
+                        self.actual_zone_occupation[drone.actual_position] = []
+                    self.actual_zone_occupation[drone.actual_position].append(drone.drone_id)
+                    self.actual_zone_occupation[previous_position].remove(drone.drone_id)
+                    if self.static_map.zone_map[drone.actual_position].finish_zone:
+                        drone.reached_final_zone = True
+                    turn_movements.append(f"D{drone.drone_id}-{drone.actual_position}")
+        
         self.movement_log.append(" ".join(turn_movements))
     
     def run_simulation(self) -> None:
         self.initialize_drones()
-        while not all (drone.reached_final_zone for drone in self.drone_list):
+        max_turns = 1000
+        while not all(drone.reached_final_zone for drone in self.drone_list):
             self.process_turn()
+            if self.turn_count > max_turns:
+                raise SimulationTimeoutError(
+                    f"Simulation exceeded {max_turns} turns without completing"
+                )
 
 
 if __name__ == "__main__":
@@ -210,5 +195,3 @@ if __name__ == "__main__":
     print(f"Simulation Finished")
     for logro in simu.movement_log:
         print(logro)
-    
-    
