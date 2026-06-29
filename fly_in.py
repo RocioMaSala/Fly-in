@@ -188,7 +188,10 @@ class Simulation:
 
 
 if __name__ == "__main__":
+    from display import display_static_map
+    
     my_map = map_creation()
+    display_static_map(my_map)
     simu = Simulation(static_map=my_map)
     simu.run_simulation()
 
