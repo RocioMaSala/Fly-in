@@ -80,7 +80,7 @@ class Simulation:
                 if self.static_map.zone_map[dest_zone].zone_type == ZoneTypes.NORMAL:
                     cost = 1
                 elif self.static_map.zone_map[dest_zone].zone_type == ZoneTypes.PRIORITY:
-                    cost = 1
+                    cost = 0.9
                 elif self.static_map.zone_map[dest_zone].zone_type == ZoneTypes.RESTRICTED:
                     cost = 2
                 else:
@@ -107,7 +107,6 @@ class Simulation:
     
     def process_turn(self) -> None:
         self.turn_count += 1
-        print(f"--- Turno {self.turn_count} ---")
         active_drones = [drone for drone in self.drone_list if not drone.reached_final_zone]
         temp_dist_path = {}
         turn_movements = []
@@ -195,6 +194,8 @@ if __name__ == "__main__":
     simu = Simulation(static_map=my_map)
     simu.run_simulation()
 
-    print(f"Simulation Finished")
-    for logro in simu.movement_log:
-        print(logro)
+    
+    print(f"Map Key:\n Zone Type Normal -> '■'\n Zone Type Blocked -> '✕'\n Zone Type Restricted -> '▲'\n Zone Type Priority -> '●'")
+    print(f"\nSimulation Finished")
+    for turn_number, logro in enumerate(simu.movement_log, start = 1):
+        print(f"Turn {turn_number}: {logro}")
