@@ -120,6 +120,7 @@ class Simulation:
             active_drones,
             key=lambda drone: (temp_dist_path[drone.drone_id][0], drone.drone_id)
         )
+        normal_connections_used: list[frozenset[str]] = []
         for drone in active_drones_sorted:
             if drone.transit_destination:
                 previous_position = drone.actual_position
@@ -165,13 +166,23 @@ class Simulation:
                     turn_movements.append(f"D{drone.drone_id}-{drone.transit_destination}")
                 else:
                     drone.actual_position = next_position
+
+                    if link_key not in self.actual_conex_occupation:
+                        self.actual_conex_occupation[link_key] = []
+                    self.actual_conex_occupation[link_key].append(drone.drone_id)
+                    normal_connections_used.append(link_key)
+
                     if drone.actual_position not in self.actual_zone_occupation:
                         self.actual_zone_occupation[drone.actual_position] = []
                     self.actual_zone_occupation[drone.actual_position].append(drone.drone_id)
                     self.actual_zone_occupation[previous_position].remove(drone.drone_id)
+                   
                     if self.static_map.zone_map[drone.actual_position].finish_zone:
                         drone.reached_final_zone = True
                     turn_movements.append(f"D{drone.drone_id}-{drone.actual_position}")
+
+        for link_key in normal_connections_used:
+            self.actual_conex_occupation[link_key] = []
         
         self.movement_log.append(" ".join(turn_movements))
     
@@ -188,14 +199,46 @@ class Simulation:
 
 if __name__ == "__main__":
     from display import display_static_map
-    
-    my_map = map_creation()
-    display_static_map(my_map)
-    simu = Simulation(static_map=my_map)
-    simu.run_simulation()
 
+    COLORES_ANSI = {
+        "green": "\033[92m",
+        "yellow": "\033[93m",
+        "blue": "\033[94m",
+        "red": "\033[91m",
+        "reset": "\033[0m"
+    }
     
-    print(f"Map Key:\n Zone Type Normal -> '■'\n Zone Type Blocked -> '✕'\n Zone Type Restricted -> '▲'\n Zone Type Priority -> '●'")
-    print(f"\nSimulation Finished")
-    for turn_number, logro in enumerate(simu.movement_log, start = 1):
-        print(f"Turn {turn_number}: {logro}")
+    try:
+        my_map = map_creation()
+        display_static_map(my_map)
+        simu = Simulation(static_map=my_map)
+        simu.run_simulation()
+        print(f"Map Key:\n Zone Type Normal -> '■'\n Zone Type Blocked -> '✕'\n Zone Type Restricted -> '▲'\n Zone Type Priority -> '●'")
+        print(f"\nSimulation Finished")
+        for turn_number, logro in enumerate(simu.movement_log, start=1):
+            if not logro.strip():
+                print(f"Turn {turn_number}: No movements")
+                continue
+                
+            movimientos_coloreados = []
+            # 'logro' contiene algo como "D1-start D2-bottleneck" -> lo separamos por espacios
+            for mov in logro.split():
+                if "-" in mov:
+                    drone_part, zone_name = mov.split("-", 1)
+                    zone_obj = my_map.zone_map.get(zone_name)
+                    
+                    color_nombre = getattr(zone_obj, 'color', 'reset')
+                    color_ansi = COLORES_ANSI.get(color_nombre, COLORES_ANSI["reset"])
+                    
+                    mov_color = f"{drone_part}-{color_ansi}{zone_name}{COLORES_ANSI['reset']}"
+                    movimientos_coloreados.append(mov_color)
+                else:
+                    movimientos_coloreados.append(mov)
+            
+            # Volvemos a juntar los movimientos del turno con espacios
+            print(f"Turn {turn_number}: {' '.join(movimientos_coloreados)}")
+    
+    except Exception as e:
+        print(e)
+
+   

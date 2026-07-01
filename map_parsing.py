@@ -59,10 +59,12 @@ def map_creation() -> DroneMap:
                         if start_hub_name is not None:
                             raise ValueError(f"Parsing Error: Multiple start_hubs detected, line {line_num}")
                         start_hub_name = zone.name
+                        max_capacity_start = zone.max_drones
                     elif line_clean.startswith("end_hub:"):
                         if end_hub_name is not None:
                             raise ValueError(f"Parsing Error: Multiple end_hubs detected, line {line_num}")
                         end_hub_name = zone.name
+                        max_capacity_finish = zone.max_drones
                     map.zone_map[zone.name] = zone
                 elif line.strip().startswith("connection"):
                     connection = parse_connection(line, line_num)
@@ -89,6 +91,16 @@ def map_creation() -> DroneMap:
 
             if start_hub_name == end_hub_name:
                 raise ValueError(f"Parsing Error: 'start_hub' and 'end_hub' cannot be the same ('{start_hub_name}')")
+            
+            # if drone_nbr > max_capacity_finish and drone_nbr > max_capacity_start:
+            #     raise ValueError(f"Parsing Error: Drone number is greater than start_hub and finish_hub capacity")
+            
+            # elif drone_nbr > max_capacity_finish:
+            #     raise ValueError(f"Parsing Error: Drone number is greater than finish_hub capacity")
+            
+            # elif drone_nbr > max_capacity_start:
+            #     raise ValueError(f"Parsing Error: Drone number is greater than start_hub capacity")
+
 
         return map
     except FileNotFoundError:
