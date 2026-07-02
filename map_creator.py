@@ -3,7 +3,6 @@ from enum import Enum
 from typing import Optional
 
 
-
 class ZoneTypeError(Exception):
     def __init__(
             self, line_num: int, message: str = "Incorrect Zone Type"
@@ -60,13 +59,14 @@ class DroneMap:
                 dict_adjacency[conection.zone_finish] = []
             dict_adjacency[conection.zone_finish].append(conection.zone_start)
         return dict_adjacency
-    
+
     def link_capacity(self) -> dict[frozenset[str], int]:
         capacity_map = {}
         for connection in self.connection_map:
             key = frozenset({connection.zone_start, connection.zone_finish})
             capacity_map[key] = connection.max_capacity
         return capacity_map
+
 
 def parse_zone(line: str, line_num: int) -> Zone:
     parts = line.strip().split()
@@ -117,7 +117,7 @@ def parse_zone(line: str, line_num: int) -> Zone:
                     color = v
                 if k == "max_drones":
                     max_drones = int(v)
-                
+
         except ZoneTypeError:
             raise
         except Exception:

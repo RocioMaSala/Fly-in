@@ -104,7 +104,7 @@ class Simulation:
         path.reverse()
         total_dist = dist[end_name]
         return (total_dist, path)
-    
+
     def process_turn(self) -> None:
         self.turn_count += 1
         active_drones = [drone for drone in self.drone_list if not drone.reached_final_zone]
@@ -144,7 +144,9 @@ class Simulation:
                 previous_position = drone.actual_position
                 next_position = path[1]
                 link_key = frozenset({previous_position, next_position})
-                drones_en_conexion = len(self.actual_conex_occupation.get(link_key, []))
+                drones_en_conexion = len(
+                    self.actual_conex_occupation.get(link_key, [])
+                    )
                 max_link = link_capacity_map.get(link_key, 1)
                 if drones_en_conexion >= max_link:
                     continue
@@ -152,7 +154,9 @@ class Simulation:
                 next_zone = self.static_map.zone_map[next_position]
                 next_zone = self.static_map.zone_map[next_position]
                 if not next_zone.finish_zone:
-                    next_zone_drones = len(self.actual_zone_occupation.get(next_position, []))
+                    next_zone_drones = len(
+                        self.actual_zone_occupation.get(next_position, [])
+                        )
                     if next_zone_drones >= next_zone.max_drones:
                         continue
 
@@ -176,16 +180,18 @@ class Simulation:
                         self.actual_zone_occupation[drone.actual_position] = []
                     self.actual_zone_occupation[drone.actual_position].append(drone.drone_id)
                     self.actual_zone_occupation[previous_position].remove(drone.drone_id)
-                   
+
                     if self.static_map.zone_map[drone.actual_position].finish_zone:
                         drone.reached_final_zone = True
-                    turn_movements.append(f"D{drone.drone_id}-{drone.actual_position}")
+                    turn_movements.append(
+                        f"D{drone.drone_id}-{drone.actual_position}"
+                        )
 
         for link_key in normal_connections_used:
             self.actual_conex_occupation[link_key] = []
-        
+
         self.movement_log.append(" ".join(turn_movements))
-    
+
     def run_simulation(self) -> None:
         self.initialize_drones()
         max_turns = 1000
@@ -207,38 +213,43 @@ if __name__ == "__main__":
         "red": "\033[91m",
         "reset": "\033[0m"
     }
-    
+
     try:
         my_map = map_creation()
         display_static_map(my_map)
         simu = Simulation(static_map=my_map)
         simu.run_simulation()
-        print(f"Map Key:\n Zone Type Normal -> '■'\n Zone Type Blocked -> '✕'\n Zone Type Restricted -> '▲'\n Zone Type Priority -> '●'")
-        print(f"\nSimulation Finished")
+        print(
+            "Map Key:\n Zone Type Normal -> '■'\n "
+            "Zone Type Blocked -> '✕'\n "
+            "Zone Type Restricted -> '▲'\n "
+            "Zone Type Priority -> '●'")
+        print("\nSimulation Finished")
         for turn_number, logro in enumerate(simu.movement_log, start=1):
             if not logro.strip():
                 print(f"Turn {turn_number}: No movements")
                 continue
-                
+
             movimientos_coloreados = []
-            # 'logro' contiene algo como "D1-start D2-bottleneck" -> lo separamos por espacios
+
             for mov in logro.split():
                 if "-" in mov:
                     drone_part, zone_name = mov.split("-", 1)
                     zone_obj = my_map.zone_map.get(zone_name)
-                    
+
                     color_nombre = getattr(zone_obj, 'color', 'reset')
-                    color_ansi = COLORES_ANSI.get(color_nombre, COLORES_ANSI["reset"])
-                    
-                    mov_color = f"{drone_part}-{color_ansi}{zone_name}{COLORES_ANSI['reset']}"
+                    color_ansi = COLORES_ANSI.get(
+                        color_nombre, COLORES_ANSI["reset"]
+                        )
+
+                    mov_color = (
+                        f"{drone_part}-"
+                        f"{color_ansi}{zone_name}{COLORES_ANSI['reset']}")
                     movimientos_coloreados.append(mov_color)
                 else:
                     movimientos_coloreados.append(mov)
-            
-            # Volvemos a juntar los movimientos del turno con espacios
+
             print(f"Turn {turn_number}: {' '.join(movimientos_coloreados)}")
-    
+
     except Exception as e:
         print(e)
-
-   
