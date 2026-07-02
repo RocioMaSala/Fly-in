@@ -50,7 +50,7 @@ class DroneMap:
     connection_map: list[Connection] = field(default_factory=list)
 
     def adjacency(self) -> dict[str, list[str]]:
-        dict_adjacency = {}
+        dict_adjacency: dict[str, list[str]] = {}
         for conection in self.connection_map:
             if conection.zone_start not in dict_adjacency:
                 dict_adjacency[conection.zone_start] = []

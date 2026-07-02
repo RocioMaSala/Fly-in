@@ -10,7 +10,7 @@ def get_ansi_color(color_name: str | None) -> str:
         "magenta": "35",
         "cyan": "36",
         "white": "37",
-        "orange": "33",
+        "orange": "\033[38;5;208m",
     }
     default_color = color_dict["white"]
     if color_name is None:

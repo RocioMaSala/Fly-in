@@ -46,6 +46,10 @@ def map_creation() -> DroneMap:
                 try:
                     value_part = line_clean.split(":", 1)[1].strip()
                     drone_nbr = int(value_part)
+                    if drone_nbr > 301:
+                        raise DroneNumberError(
+                            "Value Error: Drone Number must be less than 50"
+                        )
                 except (IndexError, ValueError):
                     raise DroneNumberError(
                         "Value Error: A valid drone number is "
@@ -65,6 +69,7 @@ def map_creation() -> DroneMap:
 
             map = DroneMap(drone_nbr)
 
+            seen_coords = set()
             for line in file:
                 line_num += 1
                 line_clean = line.strip()
@@ -72,6 +77,14 @@ def map_creation() -> DroneMap:
                     continue
                 if line_clean.startswith(("start_hub", "end_hub", "hub")):
                     zone = parse_zone(line, line_num)
+                    actual_coords = (zone.coord_x, zone.coord_y)
+                    if actual_coords in seen_coords:
+                        raise ValueError(
+                            "Parsing Error: Coordinates duplicated "
+                            f"for '{zone.name}', "
+                            f"line {line_num}"
+                        )
+                    seen_coords.add(actual_coords)
                     if line_clean.startswith("start_hub:"):
                         if start_hub_name is not None:
                             raise ValueError(
@@ -91,6 +104,7 @@ def map_creation() -> DroneMap:
                         if "max_drones" not in line_clean:
                             zone.max_drones = drone_nbr
                         max_cpacty_finish = zone.max_drones
+
                     map.zone_map[zone.name] = zone
 
                 elif line.strip().startswith("connection"):
